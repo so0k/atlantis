@@ -22,7 +22,7 @@ const (
 	Error
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_github_status.go GHStatusUpdater
+//go:generate pegomock generate -m  --use-experimental-model-gen --package mocks -o mocks/mock_github_status.go GHStatusUpdater
 
 type GHStatusUpdater interface {
 	Update(repo models.Repo, pull models.PullRequest, status Status, cmd *Command) error

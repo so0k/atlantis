@@ -9,7 +9,7 @@ import (
 	"github.com/hootsuite/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
+//go:generate pegomock generate -m  --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
 
 type Command struct {
 	Name        CommandName

@@ -4,11 +4,12 @@
 package mocks
 
 import (
+	"reflect"
+
 	github "github.com/google/go-github/github"
 	events "github.com/hootsuite/atlantis/server/events"
 	models "github.com/hootsuite/atlantis/server/events/models"
 	pegomock "github.com/petergtz/pegomock"
-	"reflect"
 )
 
 type MockEventParsing struct {

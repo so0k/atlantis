@@ -8,7 +8,7 @@ import (
 	"github.com/hootsuite/atlantis/server/recovery"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_command_runner.go CommandRunner
+//go:generate pegomock generate -m  --use-experimental-model-gen --package mocks -o mocks/mock_command_runner.go CommandRunner
 
 type CommandRunner interface {
 	ExecuteCommand(ctx *CommandContext)

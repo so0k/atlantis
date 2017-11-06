@@ -4,8 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	"reflect"
-
 	"strings"
 
 	"github.com/google/go-github/github"
@@ -13,6 +11,7 @@ import (
 	gh "github.com/hootsuite/atlantis/server/events/github/fixtures"
 	ghmocks "github.com/hootsuite/atlantis/server/events/github/mocks"
 	"github.com/hootsuite/atlantis/server/events/mocks"
+	"github.com/hootsuite/atlantis/server/events/mocks/matchers"
 	"github.com/hootsuite/atlantis/server/events/models/fixtures"
 	"github.com/hootsuite/atlantis/server/logging"
 	. "github.com/hootsuite/atlantis/testing"
@@ -59,7 +58,7 @@ func TestExecuteCommand_LogPanics(t *testing.T) {
 		BaseRepo: fixtures.Repo,
 		Pull:     fixtures.Pull,
 	})
-	_, _, comment := ghClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyPullRequest(), AnyString()).GetCapturedArguments()
+	_, _, comment := ghClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), matchers.AnyModelsPullrequest(), AnyString()).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "Error: goroutine panic"), "comment should be about a goroutine panic")
 }
 
@@ -158,23 +157,18 @@ func TestExecuteCommand_FullRun(t *testing.T) {
 		When(envLocker.TryLock(fixtures.Repo.FullName, cmd.Environment, fixtures.Pull.Num)).ThenReturn(true)
 		switch c {
 		case events.Help:
-			When(helper.Execute(AnyCommandContext())).ThenReturn(cmdResponse)
+			When(helper.Execute(matchers.AnyPtrToEventsCommandcontext())).ThenReturn(cmdResponse)
 		case events.Plan:
-			When(planner.Execute(AnyCommandContext())).ThenReturn(cmdResponse)
+			When(planner.Execute(matchers.AnyPtrToEventsCommandcontext())).ThenReturn(cmdResponse)
 		case events.Apply:
-			When(applier.Execute(AnyCommandContext())).ThenReturn(cmdResponse)
+			When(applier.Execute(matchers.AnyPtrToEventsCommandcontext())).ThenReturn(cmdResponse)
 		}
 
 		ch.ExecuteCommand(&baseCtx)
 
 		ghStatus.VerifyWasCalledOnce().Update(fixtures.Repo, fixtures.Pull, events.Pending, &cmd)
 		ghStatus.VerifyWasCalledOnce().UpdateProjectResult(&baseCtx, cmdResponse)
-		ghClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyPullRequest(), AnyString())
+		ghClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), matchers.AnyModelsPullrequest(), AnyString())
 		envLocker.VerifyWasCalledOnce().Unlock(fixtures.Repo.FullName, cmd.Environment, fixtures.Pull.Num)
 	}
-}
-
-func AnyCommandContext() *events.CommandContext {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(&events.CommandContext{})))
-	return &events.CommandContext{}
 }

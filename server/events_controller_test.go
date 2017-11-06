@@ -5,14 +5,13 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"testing"
 	"time"
 
-	"github.com/google/go-github/github"
 	"github.com/hootsuite/atlantis/server"
 	"github.com/hootsuite/atlantis/server/events"
 	emocks "github.com/hootsuite/atlantis/server/events/mocks"
+	"github.com/hootsuite/atlantis/server/events/mocks/matchers"
 	"github.com/hootsuite/atlantis/server/events/models"
 	"github.com/hootsuite/atlantis/server/logging"
 	"github.com/hootsuite/atlantis/server/mocks"
@@ -60,7 +59,7 @@ func TestPost_CommentInvalidComment(t *testing.T) {
 	eventsReq.Header.Set("X-Github-Event", "issue_comment")
 	event := `{"action": "created"}`
 	When(v.Validate(eventsReq, []byte(secret))).ThenReturn([]byte(event), nil)
-	When(p.ExtractCommentData(AnyComment())).ThenReturn(models.Repo{}, models.User{}, models.PullRequest{}, errors.New("err"))
+	When(p.ExtractCommentData(matchers.AnyPtrToGithubIssuecommentevent())).ThenReturn(models.Repo{}, models.User{}, models.PullRequest{}, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
 	responseContains(t, w, http.StatusBadRequest, "Failed parsing event")
@@ -72,8 +71,8 @@ func TestPost_CommentInvalidCommand(t *testing.T) {
 	eventsReq.Header.Set("X-Github-Event", "issue_comment")
 	event := `{"action": "created"}`
 	When(v.Validate(eventsReq, []byte(secret))).ThenReturn([]byte(event), nil)
-	When(p.ExtractCommentData(AnyComment())).ThenReturn(models.Repo{}, models.User{}, models.PullRequest{}, nil)
-	When(p.DetermineCommand(AnyComment())).ThenReturn(nil, errors.New("err"))
+	When(p.ExtractCommentData(matchers.AnyPtrToGithubIssuecommentevent())).ThenReturn(models.Repo{}, models.User{}, models.PullRequest{}, nil)
+	When(p.DetermineCommand(matchers.AnyPtrToGithubIssuecommentevent())).ThenReturn(nil, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
 	responseContains(t, w, http.StatusOK, "Ignoring: err")
@@ -89,15 +88,15 @@ func TestPost_CommentSuccess(t *testing.T) {
 	user := models.User{}
 	pull := models.PullRequest{}
 	cmd := events.Command{}
-	When(p.ExtractCommentData(AnyComment())).ThenReturn(baseRepo, user, pull, nil)
-	When(p.DetermineCommand(AnyComment())).ThenReturn(&cmd, nil)
+	When(p.ExtractCommentData(matchers.AnyPtrToGithubIssuecommentevent())).ThenReturn(baseRepo, user, pull, nil)
+	When(p.DetermineCommand(matchers.AnyPtrToGithubIssuecommentevent())).ThenReturn(&cmd, nil)
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
 	responseContains(t, w, http.StatusOK, "Processing...")
 
 	// wait for 200ms so goroutine is called
 	time.Sleep(200 * time.Millisecond)
-	ctx := cr.VerifyWasCalledOnce().ExecuteCommand(AnyCommandContext()).GetCapturedArguments()
+	ctx := cr.VerifyWasCalledOnce().ExecuteCommand(matchers.AnyPtrToEventsCommandcontext()).GetCapturedArguments()
 	Equals(t, baseRepo, ctx.BaseRepo)
 	Equals(t, user, ctx.User)
 	Equals(t, pull, ctx.Pull)
@@ -122,7 +121,7 @@ func TestPost_PullRequestInvalid(t *testing.T) {
 
 	event := `{"action": "closed"}`
 	When(v.Validate(eventsReq, []byte(secret))).ThenReturn([]byte(event), nil)
-	When(p.ExtractPullData(AnyPull())).ThenReturn(models.PullRequest{}, models.Repo{}, errors.New("err"))
+	When(p.ExtractPullData(matchers.AnyPtrToGithubPullrequest())).ThenReturn(models.PullRequest{}, models.Repo{}, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
 	responseContains(t, w, http.StatusBadRequest, "Error parsing pull data: err")
@@ -135,8 +134,8 @@ func TestPost_PullRequestInvalidRepo(t *testing.T) {
 
 	event := `{"action": "closed"}`
 	When(v.Validate(eventsReq, []byte(secret))).ThenReturn([]byte(event), nil)
-	When(p.ExtractPullData(AnyPull())).ThenReturn(models.PullRequest{}, models.Repo{}, nil)
-	When(p.ExtractRepoData(AnyRepo())).ThenReturn(models.Repo{}, errors.New("err"))
+	When(p.ExtractPullData(matchers.AnyPtrToGithubPullrequest())).ThenReturn(models.PullRequest{}, models.Repo{}, nil)
+	When(p.ExtractRepoData(matchers.AnyPtrToGithubRepository())).ThenReturn(models.Repo{}, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
 	responseContains(t, w, http.StatusBadRequest, "Error parsing repo data: err")
@@ -152,8 +151,8 @@ func TestPost_PullRequestErrCleaningPull(t *testing.T) {
 	When(v.Validate(eventsReq, []byte(secret))).ThenReturn([]byte(event), nil)
 	repo := models.Repo{}
 	pull := models.PullRequest{}
-	When(p.ExtractPullData(AnyPull())).ThenReturn(pull, repo, nil)
-	When(p.ExtractRepoData(AnyRepo())).ThenReturn(repo, nil)
+	When(p.ExtractPullData(matchers.AnyPtrToGithubPullrequest())).ThenReturn(pull, repo, nil)
+	When(p.ExtractRepoData(matchers.AnyPtrToGithubRepository())).ThenReturn(repo, nil)
 	When(c.CleanUpPull(repo, pull)).ThenReturn(errors.New("cleanup err"))
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
@@ -169,8 +168,8 @@ func TestPost_PullRequestSuccess(t *testing.T) {
 	When(v.Validate(eventsReq, []byte(secret))).ThenReturn([]byte(event), nil)
 	repo := models.Repo{}
 	pull := models.PullRequest{}
-	When(p.ExtractPullData(AnyPull())).ThenReturn(pull, repo, nil)
-	When(p.ExtractRepoData(AnyRepo())).ThenReturn(repo, nil)
+	When(p.ExtractPullData(matchers.AnyPtrToGithubPullrequest())).ThenReturn(pull, repo, nil)
+	When(p.ExtractRepoData(matchers.AnyPtrToGithubRepository())).ThenReturn(repo, nil)
 	When(c.CleanUpPull(repo, pull)).ThenReturn(nil)
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
@@ -193,24 +192,4 @@ func setup(t *testing.T) (server.EventsController, *mocks.MockGHRequestValidator
 		GithubWebHookSecret: []byte(secret),
 	}
 	return e, v, p, cr, c
-}
-
-func AnyComment() *github.IssueCommentEvent {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(&github.IssueCommentEvent{})))
-	return &github.IssueCommentEvent{}
-}
-
-func AnyPull() *github.PullRequest {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(&github.PullRequest{})))
-	return &github.PullRequest{}
-}
-
-func AnyRepo() *github.Repository {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(&github.Repository{})))
-	return &github.Repository{}
-}
-
-func AnyCommandContext() *events.CommandContext {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(&events.CommandContext{})))
-	return &events.CommandContext{}
 }
