@@ -18,7 +18,7 @@ type ApplyExecutor struct {
 	VCSClient         vcs.ClientProxy
 	Terraform         *terraform.Client
 	RequireApproval   bool
-	Run               *run.Run
+	Run               *run.DefaultRunner
 	Workspace         Workspace
 	ProjectPreExecute *DefaultProjectPreExecutor
 	Webhooks          webhooks.Sender

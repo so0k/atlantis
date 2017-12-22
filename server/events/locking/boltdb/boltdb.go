@@ -16,7 +16,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// BoltLocker is a locking backend using BoltDB
+// BoltLocker is a locking backend using BoltDB.
 type BoltLocker struct {
 	db     *bolt.DB
 	bucket []byte
@@ -25,7 +25,7 @@ type BoltLocker struct {
 const bucketName = "runLocks"
 
 // New returns a valid locker. We need to be able to write to dataDir
-// since bolt stores its data as a file
+// since bolt stores its data as a file.
 func New(dataDir string) (*BoltLocker, error) {
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		return nil, errors.Wrap(err, "creating data dir")
@@ -67,7 +67,7 @@ func (b *BoltLocker) TryLock(newLock models.ProjectLock) (bool, models.ProjectLo
 	transactionErr := b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.bucket)
 
-		// if there is no run at that key then we're free to create the lock
+		// If there is no lock at that key then we're free to create the lock.
 		currLockSerialized := bucket.Get([]byte(key))
 		if currLockSerialized == nil {
 			// This will only error on readonly buckets, it's okay to ignore.
@@ -77,7 +77,7 @@ func (b *BoltLocker) TryLock(newLock models.ProjectLock) (bool, models.ProjectLo
 			return nil
 		}
 
-		// otherwise the lock fails, return to caller the run that's holding the lock
+		// Otherwise the lock fails, return to caller the current lock.
 		if err := json.Unmarshal(currLockSerialized, &currLock); err != nil {
 			return errors.Wrap(err, "failed to deserialize current lock")
 		}
@@ -134,7 +134,7 @@ func (b BoltLocker) List() ([]models.ProjectLock, error) {
 		return locks, errors.Wrap(err, "DB transaction failed")
 	}
 
-	// deserialize bytes into the proper objects
+	// Deserialize bytes into the proper objects.
 	for k, v := range locksBytes {
 		var lock models.ProjectLock
 		if err := json.Unmarshal(v, &lock); err != nil {
@@ -146,13 +146,15 @@ func (b BoltLocker) List() ([]models.ProjectLock, error) {
 	return locks, nil
 }
 
-// UnlockByPull deletes all locks associated with that pull request and returns them.
+// UnlockByPull deletes all locks associated with that pull request
+// and returns them.
 func (b BoltLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
 	var locks []models.ProjectLock
 	err := b.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(b.bucket).Cursor()
 
-		// we can use the repoFullName as a prefix search since that's the first part of the key
+		// We can use the repoFullName as a prefix search since that's the first
+		// part of the key.
 		for k, v := c.Seek([]byte(repoFullName)); k != nil && bytes.HasPrefix(k, []byte(repoFullName)); k, v = c.Next() {
 			var lock models.ProjectLock
 			if err := json.Unmarshal(v, &lock); err != nil {
@@ -168,7 +170,7 @@ func (b BoltLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.Pro
 		return locks, err
 	}
 
-	// delete the locks
+	// Delete the locks.
 	for _, lock := range locks {
 		if _, err = b.Unlock(lock.Project, lock.Env); err != nil {
 			return locks, errors.Wrapf(err, "unlocking repo %s, path %s, env %s", lock.Project.RepoFullName, lock.Project.Path, lock.Env)
@@ -190,7 +192,7 @@ func (b BoltLocker) GetLock(p models.Project, env string) (*models.ProjectLock, 
 	if err != nil {
 		return nil, errors.Wrap(err, "getting lock data")
 	}
-	// lockBytes will be nil if there was no data at that key
+	// lockBytes will be nil if there was no data at that key.
 	if lockBytes == nil {
 		return nil, nil
 	}
@@ -200,7 +202,8 @@ func (b BoltLocker) GetLock(p models.Project, env string) (*models.ProjectLock, 
 		return nil, errors.Wrapf(err, "deserializing lock at key %q", key)
 	}
 
-	// need to set it to Local after deserialization due to https://github.com/golang/go/issues/19486
+	// Need to set it to Local after deserialization due to
+	// https://github.com/golang/go/issues/19486
 	lock.Time = lock.Time.Local()
 	return &lock, nil
 }

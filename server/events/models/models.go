@@ -46,6 +46,7 @@ type PullRequest struct {
 	State PullRequestState
 }
 
+// PullRequestState represents whether the pull request is open or closed.l
 type PullRequestState int
 
 const (

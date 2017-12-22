@@ -131,7 +131,7 @@ func NewServer(config Config) (*Server, error) {
 		return nil, err
 	}
 	lockingClient := locking.NewClient(boltdb)
-	run := &run.Run{}
+	run := &run.DefaultRunner{}
 	configReader := &events.ProjectConfigManager{}
 	concurrentRunLocker := events.NewDefaultWorkspaceLocker()
 	workspace := &events.FileWorkspace{

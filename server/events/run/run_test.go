@@ -9,7 +9,7 @@ import (
 )
 
 var logger = logging.NewNoopLogger()
-var run = &Run{}
+var run = &DefaultRunner{}
 
 func TestRunCreateScript_valid(t *testing.T) {
 	cmds := []string{"echo", "date"}

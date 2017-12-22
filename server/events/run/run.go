@@ -19,22 +19,30 @@ const inlineShebang = "#!/bin/sh -e"
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
 
+// Runner is an interface for running bash commands.
 type Runner interface {
+	// Execute runs each command in commands. It sets the following environment
+	// variables:
+	// WORKSPACE to path
+	// ENVIRONMENT to environment
+	// ATLANTIS_TERRAFORM_VERSION to terraformVersion
+	// stage is whether this is a pre_plan, post_plan, etc. It's only used for
+	// logging.
 	Execute(log *logging.SimpleLogger, commands []string, path string, environment string, terraformVersion *version.Version, stage string) (string, error)
 }
 
-type Run struct{}
+// DefaultRunner implements Runner.
+type DefaultRunner struct{}
 
-// Execute runs the commands by writing them as a script to disk
-// and then executing the script.
-func (p *Run) Execute(
+// Execute see Runner.Execute.
+func (p *DefaultRunner) Execute(
 	log *logging.SimpleLogger,
 	commands []string,
 	path string,
 	environment string,
 	terraformVersion *version.Version,
 	stage string) (string, error) {
-	// we create a script from the commands provided
+	// Create a script from the commands provided.
 	if len(commands) == 0 {
 		return "", errors.Errorf("%s commands cannot be empty", stage)
 	}
@@ -46,10 +54,6 @@ func (p *Run) Execute(
 	defer os.Remove(s) // nolint: errcheck
 
 	log.Info("running %s commands: %v", stage, commands)
-
-	// set environment variable for the run.
-	// this is to support scripts to use the ENVIRONMENT, ATLANTIS_TERRAFORM_VERSION
-	// and WORKSPACE variables in their scripts
 	os.Setenv("ENVIRONMENT", environment)                              // nolint: errcheck
 	os.Setenv("ATLANTIS_TERRAFORM_VERSION", terraformVersion.String()) // nolint: errcheck
 	os.Setenv("WORKSPACE", path)                                       // nolint: errcheck
@@ -57,6 +61,9 @@ func (p *Run) Execute(
 }
 
 func createScript(cmds []string, stage string) (string, error) {
+	// Write out the contents to a bash script that we execute. We do this
+	// so we can ensure we don't have any weird execution issues when using
+	// Exec() like unexpected escaping.
 	tmp, err := ioutil.TempFile("/tmp", "atlantis-temp-script")
 	if err != nil {
 		return "", errors.Wrapf(err, "preparing %s shell script", stage)
@@ -64,7 +71,6 @@ func createScript(cmds []string, stage string) (string, error) {
 
 	scriptName := tmp.Name()
 
-	// Write our contents to it
 	writer := bufio.NewWriter(tmp)
 	if _, err = writer.WriteString(fmt.Sprintf("%s\n", inlineShebang)); err != nil {
 		return "", errors.Wrapf(err, "writing to %q", tmp.Name())
